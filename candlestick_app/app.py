@@ -47,39 +47,39 @@ def predict_movement(df, trend="neutral"):
         df.loc[df['Pattern'].isin(['Bullish_Engulfing', 'Hammer']), 'Prediction'] = 'Up'
         df.loc[df['Pattern'].isin(['Bearish_Engulfing', 'Shooting_Star']), 'Prediction'] = 'Down'
     
-...     return df
-... 
-... # Streamlit App
-... st.title("Real-Time Candlestick Pattern Detector & Predictor")
-... 
-... # User Inputs
-... stock_symbol = st.text_input("Enter Stock Symbol", "AAPL")
-... period = st.selectbox("Select Period", ["1mo", "3mo", "6mo", "1y"])
-... interval = st.selectbox("Select Interval", ["1d", "1h", "15m"])
-... trend = st.selectbox("Select Market Trend", ["neutral", "uptrend", "downtrend"])
-... 
-... if st.button("Analyze"):
-...     # Fetch data from yfinance
-...     data = yf.download(tickers=stock_symbol, period=period, interval=interval)
-...     
-...     if data.empty:
-...         st.error("No data found. Please try another stock symbol or change the settings.")
-...     else:
-...         # Prepare DataFrame
-...         df = data[['Open', 'High', 'Low', 'Close']]
-...         
-...         # Detect Patterns
-...         df = detect_candlestick_patterns(df)
-...         
-...         # Make Predictions
-...         df = predict_movement(df, trend)
-...         
-...         # Display DataFrame
-...         st.write("Pattern Detection & Prediction:")
-...         st.dataframe(df[['Open', 'High', 'Low', 'Close', 'Pattern', 'Prediction']].tail(10))
-...         
-...         # Plot Candlestick Chart
-...         st.subheader(f"Candlestick Chart for {stock_symbol}")
-...         fig, ax = plt.subplots(figsize=(10, 5))
-...         mpf.plot(df, type='candle', ax=ax, style='charles', title=f"{stock_symbol} Candlestick Chart")
-...         st.pyplot(fig)
+    return df
+
+# Streamlit App
+st.title("Real-Time Candlestick Pattern Detector & Predictor")
+
+# User Inputs
+stock_symbol = st.text_input("Enter Stock Symbol", "AAPL")
+period = st.selectbox("Select Period", ["1mo", "3mo", "6mo", "1y"])
+interval = st.selectbox("Select Interval", ["1d", "1h", "15m"])
+trend = st.selectbox("Select Market Trend", ["neutral", "uptrend", "downtrend"])
+
+if st.button("Analyze"):
+    # Fetch data from yfinance
+    data = yf.download(tickers=stock_symbol, period=period, interval=interval)
+    
+    if data.empty:
+        st.error("No data found. Please try another stock symbol or change the settings.")
+    else:
+        # Prepare DataFrame
+        df = data[['Open', 'High', 'Low', 'Close']]
+        
+        # Detect Patterns
+        df = detect_candlestick_patterns(df)
+        
+        # Make Predictions
+        df = predict_movement(df, trend)
+        
+        # Display DataFrame
+        st.write("Pattern Detection & Prediction:")
+        st.dataframe(df[['Open', 'High', 'Low', 'Close', 'Pattern', 'Prediction']].tail(10))
+        
+        # Plot Candlestick Chart
+        st.subheader(f"Candlestick Chart for {stock_symbol}")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        mpf.plot(df, type='candle', ax=ax, style='charles', title=f"{stock_symbol} Candlestick Chart")
+        st.pyplot(fig)
