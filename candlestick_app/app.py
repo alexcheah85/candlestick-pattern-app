@@ -1,138 +1,103 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import yfinance as yf
-import plotly.graph_objs as go
+import matplotlib.pyplot as plt
+import mplfinance as mpf
 
-# Function to detect basic candlestick patterns
-def detect_candlestick_patterns(df):
-    """
-    Detects candlestick patterns in a DataFrame with OHLC data.
-    Columns: 'Open', 'High', 'Low', 'Close'
-    Returns a DataFrame with pattern labels.
-    """
-    df['Body'] = abs(df['Close'] - df['Open'])
-    df['Upper_Shadow'] = df['High'] - df[['Open', 'Close']].max(axis=1)
-    df['Lower_Shadow'] = df[['Open', 'Close']].min(axis=1) - df['Low']
-    df['Pattern'] = 'None'
-    
-    # Doji: Small body relative to range
-    df.loc[(df['Body'] <= 0.1 * (df['High'] - df['Low'])) & 
-           (df['Upper_Shadow'] > 0) & (df['Lower_Shadow'] > 0), 'Pattern'] = 'Doji'
-    
-    # Hammer: Small body, long lower shadow, in downtrend
-    df.loc[(df['Body'] <= 0.3 * (df['High'] - df['Low'])) & 
-           (df['Lower_Shadow'] > 2 * df['Body']) & 
-           (df['Upper_Shadow'] < df['Body']), 'Pattern'] = 'Hammer'
-    
-    # Bullish Engulfing: Current candle engulfs previous bearish candle
-    df.loc[(df['Close'] > df['Open']) & 
-           (df['Close'].shift(1) < df['Open'].shift(1)) & 
-           (df['Close'] > df['Open'].shift(1)) & 
-           (df['Open'] < df['Close'].shift(1)), 'Pattern'] = 'Bullish_Engulfing'
-    
-    # Bearish Engulfing: Current candle engulfs previous bullish candle
-    df.loc[(df['Close'] < df['Open']) & 
-           (df['Close'].shift(1) > df['Open'].shift(1)) & 
-           (df['Close'] < df['Open'].shift(1)) & 
-           (df['Open'] > df['Close'].shift(1)), 'Pattern'] = 'Bearish_Engulfing'
-    
-    return df
+st.set_page_config(page_title="Candlestick Pattern Detector", layout="wide")
 
-# Prediction function based on pattern and trend
-def predict_movement(df, trend="neutral"):
-    """
-    Predicts stock movement based on candlestick patterns and trend.
-    Trend: 'uptrend', 'downtrend', or 'neutral'
-    Returns 'Up', 'Down', or 'Hold'.
-    """
-    df['Prediction'] = 'Hold'
+# Title and Description
+st.title("📈 Candlestick Pattern Detector")
+st.markdown("Identify candlestick patterns and predict stock movements using historical data.")
+
+# Sidebar Inputs
+st.sidebar.header("Stock Data Settings")
+symbol = st.sidebar.text_input("Enter Stock Symbol (e.g., AAPL):", value="AAPL")
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2025-01-01"))
+end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2025-03-21"))
+trend = st.sidebar.selectbox("Select Market Trend", ["uptrend", "downtrend", "neutral"])
+st.sidebar.markdown("---")
+
+# Fetch Stock Data
+st.subheader(f"Fetching data for {symbol} from {start_date} to {end_date}")
+try:
+    df = yf.download(symbol, start=start_date, end=end_date)
     
-    if trend == "uptrend":
-        df.loc[df['Pattern'] == 'Bullish_Engulfing', 'Prediction'] = 'Up'
-        df.loc[df['Pattern'] == 'Hammer', 'Prediction'] = 'Up'
-        df.loc[df['Pattern'] == 'Bearish_Engulfing', 'Prediction'] = 'Down'
-    
-    elif trend == "downtrend":
-        df.loc[df['Pattern'] == 'Bullish_Engulfing', 'Prediction'] = 'Up'
-        df.loc[df['Pattern'] == 'Hammer', 'Prediction'] = 'Up'
-        df.loc[df['Pattern'] == 'Bearish_Engulfing', 'Prediction'] = 'Down'
-    
+    if df.empty:
+        st.error("No data fetched. Please check the stock symbol or date range.")
     else:
-        df.loc[df['Pattern'] == 'Bullish_Engulfing', 'Prediction'] = 'Up'
-        df.loc[df['Pattern'] == 'Hammer', 'Prediction'] = 'Up'
-        df.loc[df['Pattern'] == 'Bearish_Engulfing', 'Prediction'] = 'Down'
-    
-    return df
+        st.success("Data successfully fetched!")
+        st.write(df.tail())
 
-# Plot candlestick chart
-def plot_candlestick_chart(df):
-    fig = go.Figure(data=[go.Candlestick(
-        x=df.index,
-        open=df['Open'],
-        high=df['High'],
-        low=df['Low'],
-        close=df['Close'],
-        name='Candlesticks'
-    )])
-    
-    # Adding detected patterns
-    patterns = df[df['Pattern'] != 'None']
-    for i, row in patterns.iterrows():
-        fig.add_annotation(
-            x=i,
-            y=row['Close'],
-            text=row['Pattern'],
-            showarrow=True,
-            arrowhead=1,
-            yshift=10,
-            font=dict(color="red", size=10)
-        )
-    
-    fig.update_layout(
-        title='Candlestick Chart with Pattern Detection',
-        xaxis_title='Date',
-        yaxis_title='Price',
-        template='plotly_dark'
-    )
-    
-    st.plotly_chart(fig)
-
-# Streamlit UI
-st.title("Candlestick Pattern Detection & Prediction")
-st.write("Upload your CSV file with 'Date', 'Open', 'High', 'Low', 'Close' columns.")
-
-uploaded_file = st.file_uploader("Choose a file", type="csv")
-trend = st.selectbox("Select the trend", ["neutral", "uptrend", "downtrend"])
-
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file, parse_dates=['Date'], index_col='Date')
-    
-    if all(col in df.columns for col in ['Open', 'High', 'Low', 'Close']):
-        st.write("Original Data:")
-        st.dataframe(df)
+        # Plotting the stock price
+        st.subheader("Price Chart")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        mpf.plot(df, type='candle', style='charles', ax=ax)
+        st.pyplot(fig)
         
-        # Detect patterns
+        # Function to detect candlestick patterns
+        def detect_candlestick_patterns(df):
+            df['Body'] = abs(df['Close'] - df['Open'])
+            df['Upper_Shadow'] = df['High'] - df[['Open', 'Close']].max(axis=1)
+            df['Lower_Shadow'] = df[['Open', 'Close']].min(axis=1) - df['Low']
+            df['Pattern'] = 'None'
+
+            # Doji
+            df.loc[(df['Body'] <= 0.1 * (df['High'] - df['Low'])) & 
+                   (df['Upper_Shadow'] > 0) & (df['Lower_Shadow'] > 0), 'Pattern'] = 'Doji'
+            
+            # Hammer
+            df.loc[(df['Body'] <= 0.3 * (df['High'] - df['Low'])) & 
+                   (df['Lower_Shadow'] > 2 * df['Body']) & 
+                   (df['Upper_Shadow'] < df['Body']), 'Pattern'] = 'Hammer'
+            
+            # Bullish Engulfing
+            df.loc[(df['Close'] > df['Open']) & 
+                   (df['Close'].shift(1) < df['Open'].shift(1)) & 
+                   (df['Close'] > df['Open'].shift(1)) & 
+                   (df['Open'] < df['Close'].shift(1)), 'Pattern'] = 'Bullish_Engulfing'
+            
+            # Bearish Engulfing
+            df.loc[(df['Close'] < df['Open']) & 
+                   (df['Close'].shift(1) > df['Open'].shift(1)) & 
+                   (df['Close'] < df['Open'].shift(1)) & 
+                   (df['Open'] > df['Close'].shift(1)), 'Pattern'] = 'Bearish_Engulfing'
+            
+            return df
+
+        # Apply pattern detection
         df = detect_candlestick_patterns(df)
-        
-        # Predict movement
+
+        # Function to predict stock movement
+        def predict_movement(df, trend="neutral"):
+            df['Prediction'] = 'Hold'
+            
+            if trend == "uptrend":
+                df.loc[df['Pattern'] == 'Bullish_Engulfing', 'Prediction'] = 'Up'
+                df.loc[df['Pattern'] == 'Hammer', 'Prediction'] = 'Up'
+                df.loc[df['Pattern'] == 'Doji', 'Prediction'] = 'Hold'
+                df.loc[df['Pattern'] == 'Bearish_Engulfing', 'Prediction'] = 'Down'
+            
+            elif trend == "downtrend":
+                df.loc[df['Pattern'] == 'Bullish_Engulfing', 'Prediction'] = 'Up'
+                df.loc[df['Pattern'] == 'Hammer', 'Prediction'] = 'Up'
+                df.loc[df['Pattern'] == 'Doji', 'Prediction'] = 'Hold'
+                df.loc[df['Pattern'] == 'Bearish_Engulfing', 'Prediction'] = 'Down'
+            
+            else:
+                df.loc[df['Pattern'] == 'Bullish_Engulfing', 'Prediction'] = 'Up'
+                df.loc[df['Pattern'] == 'Hammer', 'Prediction'] = 'Up'
+                df.loc[df['Pattern'] == 'Bearish_Engulfing', 'Prediction'] = 'Down'
+                df.loc[df['Pattern'] == 'Doji', 'Prediction'] = 'Hold'
+            
+            return df
+
+        # Apply prediction function
         df = predict_movement(df, trend)
-        
-        # Plot chart
-        plot_candlestick_chart(df)
-        
-        # Show processed data
-        st.write("Processed Data with Patterns & Predictions:")
-        st.dataframe(df)
-        
-        # Download CSV button
-        csv = df.to_csv().encode('utf-8')
-        st.download_button(
-            label="Download Processed Data",
-            data=csv,
-            file_name='processed_data.csv',
-            mime='text/csv',
-        )
-        
-    else:
-        st.error("The uploaded file does not contain the required columns: 'Open', 'High', 'Low', 'Close'.")
+
+        # Display Detected Patterns
+        st.subheader("Detected Patterns & Predictions")
+        st.write(df[['Open', 'High', 'Low', 'Close', 'Pattern', 'Prediction']].tail(10))
+
+except Exception as e:
+    st.error(f"An error occurred: {e}")
