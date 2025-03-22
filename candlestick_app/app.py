@@ -1,4 +1,3 @@
-Python 3.13.2 (tags/v3.13.2:4f8bb39, Feb  4 2025, 15:11:02) [MSC v.1942 32 bit (Intel)] on win32
 Type "help", "copyright", "credits" or "license()" for more information.
 import streamlit as st
 import pandas as pd
